@@ -233,12 +233,11 @@ function handleLoadDesign(id) {
 
 // ── オブジェクト名前変更 ────────────────
 function handleRenameObject(id, name) {
+  const obj = roomObjects.find(o => o.id === id)
+  if (obj) obj.data.name = name
   updateObjectData(id, { name })
   refreshList()
-  if (selectedId === id) {
-    const obj = roomObjects.find(o => o.id === id)
-    if (obj) showProperties(obj)
-  }
+  if (selectedId === id && obj) showProperties(obj)
 }
 
 // ── スナップショット ────────────────────

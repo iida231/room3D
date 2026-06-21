@@ -5,6 +5,8 @@ let idCounter = 1
 export const FURNITURE_DEFAULTS = {
   aircon:    { color: '#c8e6f8', w: 80, d: 25, h: 30, icon: '❄️', label: 'エアコン' },
   desk:      { color: '#d4a96a', w: 120, d: 60, h: 75, icon: '🪑', label: '机' },
+  sofa:      { color: '#8b7a6e', w: 180, d: 85, h: 85, icon: '🛋️', label: 'ソファー' },
+  tv:        { color: '#2c2c2c', w: 120, d: 8, h: 70, icon: '📺', label: 'テレビ' },
   closet:    { color: '#b0a090', w: 90, d: 60, h: 200, icon: '👕', label: 'クローゼット' },
   shelf:     { color: '#c8b89a', w: 90, d: 30, h: 120, icon: '📦', label: '棚' },
   bookshelf: { color: '#a08060', w: 80, d: 30, h: 180, icon: '📚', label: '本棚' },
