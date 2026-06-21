@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Room Planner 3D</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- ヘッダー -->
+    <header id="header">
+      <span class="app-title">Room Planner 3D</span>
+      <div class="header-actions">
+        <button id="btn-toggle-ceiling" class="btn-secondary">天井を隠す</button>
+        <button id="btn-pdf" class="btn-secondary">PDF出力</button>
+        <button id="btn-reset" class="btn-danger">リセット</button>
+      </div>
+    </header>
+
+    <div id="main-layout">
+      <!-- 左サイドバー -->
+      <aside id="sidebar">
+
+        <!-- 部屋の設定 -->
+        <section class="panel-section">
+          <h3 class="section-title">部屋の設定</h3>
+          <div class="form-row">
+            <label>幅 (X)</label>
+            <input type="number" id="room-width" value="600" min="100" max="2000" step="10" />
+            <span class="unit">cm</span>
+          </div>
+          <div class="form-row">
+            <label>奥行き (Z)</label>
+            <input type="number" id="room-depth" value="500" min="100" max="2000" step="10" />
+            <span class="unit">cm</span>
+          </div>
+          <div class="form-row">
+            <label>高さ (Y)</label>
+            <input type="number" id="room-height" value="240" min="150" max="500" step="10" />
+            <span class="unit">cm</span>
+          </div>
+          <div class="form-row">
+            <label>床の色</label>
+            <input type="color" id="room-floor-color" value="#8b7355" />
+          </div>
+          <div class="form-row">
+            <label>壁の色</label>
+            <input type="color" id="room-wall-color" value="#c8c8dc" />
+          </div>
+        </section>
+
+        <!-- 建築要素 -->
+        <section class="panel-section">
+          <h3 class="section-title">建築要素</h3>
+          <div class="btn-group">
+            <button id="btn-add-window" class="btn-add">+ 窓</button>
+            <button id="btn-add-door" class="btn-add">+ ドア</button>
+          </div>
+        </section>
+
+        <!-- 家具 -->
+        <section class="panel-section">
+          <h3 class="section-title">家具を追加</h3>
+          <div class="furniture-buttons">
+            <button class="btn-furniture" data-type="aircon">エアコン</button>
+            <button class="btn-furniture" data-type="desk">机</button>
+            <button class="btn-furniture" data-type="closet">クローゼット</button>
+            <button class="btn-furniture" data-type="shelf">棚</button>
+            <button class="btn-furniture" data-type="bookshelf">本棚</button>
+            <button class="btn-furniture" data-type="custom">直方体</button>
+          </div>
+        </section>
+
+        <!-- 配置済み一覧 -->
+        <section class="panel-section" id="object-list-section">
+          <h3 class="section-title">配置済み一覧</h3>
+          <ul id="object-list"></ul>
+        </section>
+      </aside>
+
+      <!-- 3D ビュー -->
+      <div id="canvas-container">
+        <canvas id="three-canvas"></canvas>
+      </div>
+
+      <!-- プロパティパネル -->
+      <aside id="properties-panel">
+        <div id="prop-empty" class="prop-placeholder">
+          オブジェクトを選択してください
+        </div>
+        <div id="prop-content" class="hidden">
+          <h3 class="section-title" id="prop-title">選択中</h3>
+
+          <section class="panel-section">
+            <h4 class="subsection-title">位置 (cm)</h4>
+            <div class="form-row">
+              <label>X</label>
+              <input type="number" id="prop-x" step="1" />
+            </div>
+            <div class="form-row">
+              <label>Z</label>
+              <input type="number" id="prop-z" step="1" />
+            </div>
+            <div class="form-row">
+              <label>Y (高さ)</label>
+              <input type="number" id="prop-y" step="1" />
+            </div>
+          </section>
+
+          <section class="panel-section" id="prop-wall-section">
+            <h4 class="subsection-title">壁の選択</h4>
+            <div class="form-row">
+              <label>壁</label>
+              <select id="prop-wall">
+                <option value="north">北 (奥)</option>
+                <option value="south">南 (手前)</option>
+                <option value="east">東 (右)</option>
+                <option value="west">西 (左)</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>横位置</label>
+              <input type="number" id="prop-wall-offset" step="1" value="0" />
+              <span class="unit">cm</span>
+            </div>
+            <div class="form-row" id="prop-wall-height-row">
+              <label>高さ位置</label>
+              <input type="number" id="prop-wall-height-offset" step="1" value="120" />
+              <span class="unit">cm</span>
+            </div>
+          </section>
+
+          <section class="panel-section">
+            <h4 class="subsection-title">サイズ (cm)</h4>
+            <div class="form-row">
+              <label>幅 (W)</label>
+              <input type="number" id="prop-w" step="1" min="1" />
+            </div>
+            <div class="form-row">
+              <label>奥行き (D)</label>
+              <input type="number" id="prop-d" step="1" min="1" />
+            </div>
+            <div class="form-row">
+              <label>高さ (H)</label>
+              <input type="number" id="prop-h" step="1" min="1" />
+            </div>
+          </section>
+
+          <section class="panel-section" id="prop-rotation-section">
+            <h4 class="subsection-title">回転</h4>
+            <div class="form-row">
+              <label>Y軸</label>
+              <input type="number" id="prop-rot" step="5" min="0" max="360" />
+              <span class="unit">°</span>
+            </div>
+          </section>
+
+          <section class="panel-section" id="prop-color-section">
+            <h4 class="subsection-title">色</h4>
+            <div class="form-row">
+              <label>カラー</label>
+              <input type="color" id="prop-color" value="#a0c4ff" />
+            </div>
+          </section>
+
+          <section class="panel-section">
+            <button id="btn-delete-selected" class="btn-danger btn-full">削除</button>
+          </section>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
