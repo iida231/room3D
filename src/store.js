@@ -63,3 +63,51 @@ export function removeObjectData(id) {
   state.objects = state.objects.filter(o => o.id !== id)
   saveState()
 }
+
+const SAVES_KEY = 'room3d_saves_v1'
+
+export function getSaves() {
+  try {
+    return JSON.parse(localStorage.getItem(SAVES_KEY) ?? '[]')
+  } catch { return [] }
+}
+
+function writeSaves(saves) {
+  localStorage.setItem(SAVES_KEY, JSON.stringify(saves))
+}
+
+export function createSave(name) {
+  const saves = getSaves()
+  saves.unshift({
+    id: `save_${Date.now()}`,
+    name: name.trim() || '無題',
+    savedAt: new Date().toISOString(),
+    state: JSON.parse(JSON.stringify(state)),
+  })
+  writeSaves(saves)
+  return saves
+}
+
+export function renameSave(id, name) {
+  const saves = getSaves()
+  const s = saves.find(s => s.id === id)
+  if (s) s.name = name.trim() || s.name
+  writeSaves(saves)
+  return saves
+}
+
+export function deleteSave(id) {
+  const saves = getSaves().filter(s => s.id !== id)
+  writeSaves(saves)
+  return saves
+}
+
+export function getSaveById(id) {
+  return getSaves().find(s => s.id === id)?.state ?? null
+}
+
+export function restoreState(savedState) {
+  state = JSON.parse(JSON.stringify(savedState))
+  saveState()
+  return state
+}

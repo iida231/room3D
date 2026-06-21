@@ -2,8 +2,8 @@ import * as THREE from 'three'
 import { initScene, getScene, getCamera, getRenderer, getControls, updateGridHelper } from './scene.js'
 import { createRoom, toggleCeiling, setFloorColor, setWallColor } from './room.js'
 import { createRoomObject, FURNITURE_DEFAULTS } from './objects.js'
-import { loadState, saveState, resetState, setRoom, addObjectData, updateObjectData, removeObjectData, getState } from './store.js'
-import { initUI, setRoomInputs, showProperties, hideProperties, updateObjectList, setCeilingButtonText } from './ui.js'
+import { loadState, saveState, resetState, setRoom, addObjectData, updateObjectData, removeObjectData, getState, getSaves, createSave, renameSave, deleteSave, getSaveById, restoreState } from './store.js'
+import { initUI, setRoomInputs, showProperties, hideProperties, updateObjectList, setCeilingButtonText, showSaveModal, updateSavesList } from './ui.js'
 import { createDimensionLabels, createFurnitureDimensions, removeFurnitureDimensions } from './dimensions.js'
 import { printFloorPlan } from './pdf.js'
 
@@ -12,6 +12,7 @@ const mouse = new THREE.Vector2()
 
 let roomObjects = []
 let selectedId = null
+let propSnapshot = null
 
 // ── ドラッグ状態 ───────────────────────
 const drag = {
@@ -55,6 +56,13 @@ function init() {
     onUpdateSelected: handleUpdateSelected,
     onDeleteSelected: handleDeleteSelected,
     onRoomColorChange: handleRoomColorChange,
+    onSaveSnapshot: handleSaveSnapshot,
+    onRestoreSnapshot: handleRestoreSnapshot,
+    onRenameObject: handleRenameObject,
+    onSaveDesign: (name) => { updateSavesList(createSave(name)) },
+    onLoadDesign: handleLoadDesign,
+    onRenameSave: (id, name) => { updateSavesList(renameSave(id, name)) },
+    onDeleteSave: (id) => { updateSavesList(deleteSave(id)) },
   })
 
   // ポインターイベント（選択＋ドラッグ）
@@ -70,6 +78,10 @@ function init() {
 
   document.getElementById('btn-pdf').addEventListener('click', () => {
     printFloorPlan(getState())
+  })
+
+  document.getElementById('btn-save').addEventListener('click', () => {
+    showSaveModal(getSaves())
   })
 
   document.getElementById('btn-reset').addEventListener('click', () => {
@@ -159,6 +171,7 @@ function handleSelectById(id) {
   selectedId = id
   const obj = roomObjects.find(o => o.id === id)
   if (obj) {
+    propSnapshot = { ...obj.data }
     obj.addHighlight(scene)
     showProperties(obj)
     createFurnitureDimensions(scene, obj)
@@ -183,6 +196,74 @@ function handleUpdateSelected(newData) {
     obj.update(newData, scene)
   }
   updateObjectData(selectedId, newData)
+  createFurnitureDimensions(scene, obj)
+}
+
+// ── デザイン読み込み ────────────────────
+function handleLoadDesign(id) {
+  const scene = getScene()
+  const savedState = getSaveById(id)
+  if (!savedState) return
+
+  roomObjects.forEach(o => o.dispose(scene))
+  roomObjects = []
+  selectedId = null
+  propSnapshot = null
+  hideProperties()
+  removeFurnitureDimensions(scene)
+
+  const s = restoreState(savedState)
+  setRoomInputs(s.room)
+  createRoom(scene, s.room.width, s.room.depth, s.room.height, {
+    floor: s.room.floorColor,
+    wall: s.room.wallColor,
+  })
+  updateGridHelper(s.room.width, s.room.depth)
+  createDimensionLabels(scene, s.room.width, s.room.depth, s.room.height)
+
+  s.objects.forEach(data => {
+    const obj = createRoomObject(data.type, { ...data }, scene, s.room)
+    obj.id = data.id
+    roomObjects.push(obj)
+  })
+  refreshList()
+
+  document.getElementById('save-modal').classList.add('hidden')
+}
+
+// ── オブジェクト名前変更 ────────────────
+function handleRenameObject(id, name) {
+  updateObjectData(id, { name })
+  refreshList()
+  if (selectedId === id) {
+    const obj = roomObjects.find(o => o.id === id)
+    if (obj) showProperties(obj)
+  }
+}
+
+// ── スナップショット ────────────────────
+function handleSaveSnapshot() {
+  if (selectedId === null) return
+  const obj = roomObjects.find(o => o.id === selectedId)
+  if (!obj) return
+  propSnapshot = { ...obj.data }
+}
+
+function handleRestoreSnapshot() {
+  if (selectedId === null || !propSnapshot) return
+  const scene = getScene()
+  const state = getState()
+  const obj = roomObjects.find(o => o.id === selectedId)
+  if (!obj) return
+
+  const newData = { ...propSnapshot }
+  if (obj.updateRoomDims) {
+    obj.update(newData, scene, state.room)
+  } else {
+    obj.update(newData, scene)
+  }
+  updateObjectData(selectedId, newData)
+  showProperties(obj)
   createFurnitureDimensions(scene, obj)
 }
 
@@ -339,7 +420,7 @@ function onPointerUp(e) {
 
 // ── リスト更新 ─────────────────────────
 function refreshList() {
-  updateObjectList(roomObjects, selectedId, handleSelectById)
+  updateObjectList(roomObjects, selectedId, handleSelectById, handleRenameObject)
 }
 
 init()
