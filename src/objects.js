@@ -102,8 +102,13 @@ export class RoomObject {
     if (this.edgeMesh) this.removeHighlight(scene)
     if (this.mesh) {
       scene.remove(this.mesh)
-      this.mesh.geometry.dispose()
-      this.mesh.material.dispose()
+      this.mesh.traverse(child => {
+        if (child.geometry) child.geometry.dispose()
+        if (child.material) {
+          if (Array.isArray(child.material)) child.material.forEach(m => m.dispose())
+          else child.material.dispose()
+        }
+      })
       this.mesh = null
     }
   }

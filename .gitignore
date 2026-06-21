@@ -1,0 +1,23 @@
+# 依存パッケージ
+node_modules/
+
+# ビルド出力
+dist/
+
+# スクリーンショット・テスト用画像
+*.png
+screenshot.png
+
+# 検証スクリプト
+verify_*.mjs
+verify_bugs.mjs
+# 全角コロン混じりの誤パス名ファイル
+C*verify_move.mjs
+
+# 一時フォルダ
+部屋/
+
+# エディタ・OS系
+.DS_Store
+Thumbs.db
+*.log

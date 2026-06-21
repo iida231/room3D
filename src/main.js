@@ -46,6 +46,7 @@ function init() {
   state.objects.forEach(data => {
     const obj = createRoomObject(data.type, { ...data }, scene, state.room)
     obj.id = data.id
+    if (obj.mesh) obj.mesh.userData.roomObjectId = data.id
     roomObjects.push(obj)
   })
   syncIdCounter(state.objects)
@@ -67,10 +68,11 @@ function init() {
     onDeleteSave: (id) => { updateSavesList(deleteSave(id)) },
   })
 
-  // ポインターイベント（選択＋ドラッグ）
-  canvas.addEventListener('pointerdown', onPointerDown)
-  canvas.addEventListener('pointermove', onPointerMove)
-  canvas.addEventListener('pointerup',   onPointerUp)
+  // ポインターイベント（ドラッグ・選択）
+  // キャプチャフェーズで登録することで OrbitControls より先に発火させる
+  canvas.addEventListener('pointerdown', onPointerDown, true)
+  canvas.addEventListener('pointermove', onPointerMove, true)
+  canvas.addEventListener('pointerup',   onPointerUp,   true)
 
   // ヘッダーボタン
   document.getElementById('btn-toggle-ceiling').addEventListener('click', () => {
@@ -106,6 +108,7 @@ function init() {
     s.objects.forEach(data => {
       const obj = createRoomObject(data.type, { ...data }, scene, s.room)
       obj.id = data.id
+      if (obj.mesh) obj.mesh.userData.roomObjectId = data.id
       roomObjects.push(obj)
     })
     syncIdCounter(s.objects)
@@ -227,6 +230,7 @@ function handleLoadDesign(id) {
   s.objects.forEach(data => {
     const obj = createRoomObject(data.type, { ...data }, scene, s.room)
     obj.id = data.id
+    if (obj.mesh) obj.mesh.userData.roomObjectId = data.id
     roomObjects.push(obj)
   })
   syncIdCounter(s.objects)
@@ -345,27 +349,34 @@ function wallHorizontal(obj, pt) {
 function onPointerDown(e) {
   if (e.button !== 0) return
   drag.clickedEmpty = false
+  drag.pending = false
+  drag.active = false
+  drag.obj = null
+  drag.plane = null
+  drag.startClient = { x: e.clientX, y: e.clientY }
+
   const obj = pickObject(e)
 
   if (!obj) {
-    drag.obj = null
     drag.clickedEmpty = true
-    return
+    return  // OrbitControls がカメラ操作を担う
   }
 
-  // 選択中でないオブジェクトをクリックした場合は選択する
+  // オブジェクトをクリック → OrbitControls にイベントを渡さない
+  e.stopImmediatePropagation()
+
+  // 未選択なら選択
   if (obj.id !== selectedId) {
     handleSelectById(obj.id)
   }
 
+  // 選択・非選択問わずドラッグ準備（1クリック目からドラッグ可能）
   const plane = getDragPlane(obj)
   const pt    = getWorldPoint(e, plane)
 
-  drag.pending     = true
-  drag.active      = false
-  drag.obj         = obj
-  drag.plane       = plane
-  drag.startClient = { x: e.clientX, y: e.clientY }
+  drag.pending = true
+  drag.obj     = obj
+  drag.plane   = plane
 
   if (pt) {
     if (obj.type === 'window' || obj.type === 'door') {
@@ -378,6 +389,7 @@ function onPointerDown(e) {
     }
   }
 
+  // ドラッグ中はカメラ操作を無効化
   getControls().enabled = false
   e.currentTarget.setPointerCapture(e.pointerId)
 }
@@ -386,10 +398,14 @@ function onPointerMove(e) {
   if (!drag.pending && !drag.active) return
   if (!drag.obj) return
 
+  // ドラッグ中は OrbitControls にイベントを渡さない
+  e.stopImmediatePropagation()
+
   const dx = e.clientX - drag.startClient.x
   const dy = e.clientY - drag.startClient.y
   if (!drag.active && Math.hypot(dx, dy) < 5) return
-  drag.active = true
+  drag.pending = false
+  drag.active  = true
   e.currentTarget.style.cursor = 'grabbing'
 
   const pt = getWorldPoint(e, drag.plane)
@@ -410,20 +426,29 @@ function onPointerMove(e) {
 
 function onPointerUp(e) {
   if (e.button !== 0) return
+
+  const wasInteracting = drag.pending || drag.active
+  if (wasInteracting) e.stopImmediatePropagation()
+
   e.currentTarget.style.cursor = ''
-  getControls().enabled = true
 
   if (drag.active && drag.obj) {
     updateObjectData(drag.obj.id, drag.obj.data)
   } else if (!drag.active && drag.clickedEmpty && selectedId !== null) {
-    // 空白クリック → 選択解除
-    const prev = roomObjects.find(o => o.id === selectedId)
-    if (prev) prev.removeHighlight(getScene())
-    removeFurnitureDimensions(getScene())
-    selectedId = null
-    hideProperties()
-    refreshList()
+    // 空白クリック（5px以内の移動）→ 選択解除
+    const dist = Math.hypot(e.clientX - drag.startClient.x, e.clientY - drag.startClient.y)
+    if (dist < 5) {
+      const prev = roomObjects.find(o => o.id === selectedId)
+      if (prev) prev.removeHighlight(getScene())
+      removeFurnitureDimensions(getScene())
+      selectedId = null
+      hideProperties()
+      refreshList()
+    }
   }
+
+  // カメラ操作を再有効化（オブジェクトをクリックしていた場合）
+  if (wasInteracting) getControls().enabled = true
 
   drag.pending      = false
   drag.active       = false
