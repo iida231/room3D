@@ -2,6 +2,11 @@ import * as THREE from 'three'
 
 let idCounter = 1
 
+export function syncIdCounter(objects) {
+  const maxId = objects.reduce((m, o) => Math.max(m, o.id ?? 0), 0)
+  if (maxId >= idCounter) idCounter = maxId + 1
+}
+
 export const FURNITURE_DEFAULTS = {
   aircon:    { color: '#c8e6f8', w: 80, d: 25, h: 30, icon: '❄️', label: 'エアコン' },
   desk:      { color: '#d4a96a', w: 120, d: 60, h: 75, icon: '🪑', label: '机' },

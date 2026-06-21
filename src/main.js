@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { initScene, getScene, getCamera, getRenderer, getControls, updateGridHelper } from './scene.js'
 import { createRoom, toggleCeiling, setFloorColor, setWallColor } from './room.js'
-import { createRoomObject, FURNITURE_DEFAULTS } from './objects.js'
+import { createRoomObject, FURNITURE_DEFAULTS, syncIdCounter } from './objects.js'
 import { loadState, saveState, resetState, setRoom, addObjectData, updateObjectData, removeObjectData, getState, getSaves, createSave, renameSave, deleteSave, getSaveById, restoreState } from './store.js'
 import { initUI, setRoomInputs, showProperties, hideProperties, updateObjectList, setCeilingButtonText, showSaveModal, updateSavesList } from './ui.js'
 import { createDimensionLabels, createFurnitureDimensions, removeFurnitureDimensions } from './dimensions.js'
@@ -16,13 +16,14 @@ let propSnapshot = null
 
 // ── ドラッグ状態 ───────────────────────
 const drag = {
-  pending: false,   // pointerdown でオブジェクトに当たった
-  active: false,    // 移動閾値を超えた（実際にドラッグ中）
+  pending: false,
+  active: false,
   obj: null,
+  clickedEmpty: false,
   startClient: { x: 0, y: 0 },
   plane: null,
-  offsetXZ: { x: 0, z: 0 },   // 床ドラッグ用オフセット
-  offsetWall: { h: 0, v: 0 }, // 壁ドラッグ用オフセット（水平, 垂直）
+  offsetXZ: { x: 0, z: 0 },
+  offsetWall: { h: 0, v: 0 },
 }
 
 // ── 初期化 ─────────────────────────────
@@ -47,6 +48,7 @@ function init() {
     obj.id = data.id
     roomObjects.push(obj)
   })
+  syncIdCounter(state.objects)
   refreshList()
 
   initUI({
@@ -106,6 +108,7 @@ function init() {
       obj.id = data.id
       roomObjects.push(obj)
     })
+    syncIdCounter(s.objects)
     refreshList()
   })
 }
@@ -226,6 +229,7 @@ function handleLoadDesign(id) {
     obj.id = data.id
     roomObjects.push(obj)
   })
+  syncIdCounter(s.objects)
   refreshList()
 
   document.getElementById('save-modal').classList.add('hidden')
@@ -340,10 +344,19 @@ function wallHorizontal(obj, pt) {
 
 function onPointerDown(e) {
   if (e.button !== 0) return
+  drag.clickedEmpty = false
   const obj = pickObject(e)
-  if (!obj) { drag.obj = null; return }
 
-  handleSelectById(obj.id)
+  if (!obj) {
+    drag.obj = null
+    drag.clickedEmpty = true
+    return
+  }
+
+  // 選択中でないオブジェクトをクリックした場合は選択する
+  if (obj.id !== selectedId) {
+    handleSelectById(obj.id)
+  }
 
   const plane = getDragPlane(obj)
   const pt    = getWorldPoint(e, plane)
@@ -371,6 +384,7 @@ function onPointerDown(e) {
 
 function onPointerMove(e) {
   if (!drag.pending && !drag.active) return
+  if (!drag.obj) return
 
   const dx = e.clientX - drag.startClient.x
   const dy = e.clientY - drag.startClient.y
@@ -401,7 +415,7 @@ function onPointerUp(e) {
 
   if (drag.active && drag.obj) {
     updateObjectData(drag.obj.id, drag.obj.data)
-  } else if (!drag.active && !drag.obj && selectedId !== null) {
+  } else if (!drag.active && drag.clickedEmpty && selectedId !== null) {
     // 空白クリック → 選択解除
     const prev = roomObjects.find(o => o.id === selectedId)
     if (prev) prev.removeHighlight(getScene())
@@ -411,10 +425,11 @@ function onPointerUp(e) {
     refreshList()
   }
 
-  drag.pending = false
-  drag.active  = false
-  drag.obj     = null
-  drag.plane   = null
+  drag.pending      = false
+  drag.active       = false
+  drag.obj          = null
+  drag.plane        = null
+  drag.clickedEmpty = false
 }
 
 // ── リスト更新 ─────────────────────────
